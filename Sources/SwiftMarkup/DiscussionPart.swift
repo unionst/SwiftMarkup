@@ -1,35 +1,14 @@
-@_exported import CommonMark
+import CommonMark
 
-/**
- A part of the discussion.
-
- The `DiscussionPart` enumeration has cases for each type of block-level CommonMark node
- as well as Swift Markup callouts.
- */
+/// A part of the discussion.
 public enum DiscussionPart {
-    /// A block quote.
     case blockQuote(BlockQuote)
-
-    /// A callout, such as a note, remark, or warning.
     case callout(Callout)
-
-    /// A block of code.
     case codeBlock(CodeBlock)
-
-    /// A heading.
     case heading(Heading)
-
-    /// An HTML block.
     case htmlBlock(HTMLBlock)
-
-    /// A list.
     case list(List)
-
-    /// A paragraph.
     case paragraph(Paragraph)
-
-    /// A thematic break.
-    case thematicBreak(ThematicBreak)
 
     init?(_ node: Node & Block) {
         switch node {
@@ -45,8 +24,6 @@ public enum DiscussionPart {
             self = .list(list)
         case let paragraph as Paragraph:
             self = .paragraph(paragraph)
-        case let thematicBreak as ThematicBreak:
-            self = .thematicBreak(thematicBreak)
         default:
             return nil
         }
@@ -84,8 +61,6 @@ extension DiscussionPart: CustomStringConvertible {
             return list.description
         case .paragraph(let paragraph):
             return paragraph.description
-        case .thematicBreak(let thematicBreak):
-            return thematicBreak.description
         }
     }
 }
@@ -101,7 +76,6 @@ extension DiscussionPart: Codable {
         case htmlBlock
         case list
         case paragraph
-        case thematicBreak
     }
 
     public init(from decoder: Decoder) throws {
@@ -127,9 +101,6 @@ extension DiscussionPart: Codable {
         } else if container.contains(.paragraph) {
             let paragraph = try container.decode(Paragraph.self, forKey: .paragraph)
             self = .paragraph(paragraph)
-        } else if container.contains(.thematicBreak) {
-            let thematicBreak = try container.decode(ThematicBreak.self, forKey: .thematicBreak)
-            self = .thematicBreak(thematicBreak)
         } else {
             let context = DecodingError.Context(codingPath: decoder.codingPath, debugDescription: "invalid or missing key")
             throw DecodingError.dataCorrupted(context)
@@ -153,8 +124,6 @@ extension DiscussionPart: Codable {
             try container.encode(list, forKey: .list)
         case .paragraph(let paragraph):
             try container.encode(paragraph, forKey: .paragraph)
-        case .thematicBreak(let thematicBreak):
-            try container.encode(thematicBreak, forKey: .thematicBreak)
         }
     }
 }

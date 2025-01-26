@@ -1,10 +1,12 @@
-@_exported import CommonMark
 import Foundation
+import CommonMark
+
+// MARK: -
 
 /// Documentation for a Swift declaration.
 public struct Documentation: Hashable, Codable {
     /// The summary.
-    public var summary: Paragraph?
+    public var summary: String?
 
     /// The text segments and callouts that comprise the discussion, if any.
     public var discussionParts: [DiscussionPart] = []
@@ -13,42 +15,35 @@ public struct Documentation: Hashable, Codable {
     public var parameters: [Parameter] = []
 
     /// The documented return value.
-    public var returns: Document?
+    public var returns: String?
 
     /// The documented error throwing behavior.
-    public var `throws`: Document?
+    public var `throws`: String?
 
-    /**
-     Whether the documentation has any content.
-
-     Documentation is considered empty if all of the following criteria are met:
-     - Its `summary` property is `nil`
-     - Its `returns` property is `nil`
-     - Its `throws` property is `nil`
-     - Its `discussionParts` property is empty
-     - Its `parameters` property is empty
-     */
+    /// Whether the documentation has any content.
     public var isEmpty: Bool {
         return summary == nil &&
-            returns == nil &&
-            `throws` == nil &&
-            discussionParts.isEmpty &&
-            parameters.isEmpty
+                `throws` == nil &&
+                returns == nil &&
+                discussionParts.isEmpty &&
+                parameters.isEmpty
     }
 
     /**
      Create and return documentation from Swift Markup text.
 
-     - Parameters:
+     - Parameters
         - text: The documentation text in Swift Markup (CommonMark) format.
-     - Throws: `CommonMark.Document.Error` if the provided text can't be parsed.
+     - Throws:
+        - `CommonMark.Document.Error`
+          if the provided text can't be parsed.
      - Returns: A structured representation of the documentation.
      */
     public static func parse(_ text: String?) throws -> Documentation {
         guard let text = text else { return .init() }
         let document = try Document(text)
         let parser = Parser()
-        try parser.visitDocument(document)
+        parser.visitDocument(document)
         return parser.documentation
     }
 }
@@ -58,28 +53,36 @@ public struct Documentation: Hashable, Codable {
 extension Documentation {
     private final class Parser {
         private enum State {
+            case initial
             case summary
             case discussion
             case parameters
         }
 
-        private var state: State = .summary
+        private var state: State = .initial
 
         var documentation: Documentation = Documentation()
 
-        func visitDocument(_ node: Document) throws {
-            for case let child in node.removeChildren() {
-                try visitBlock(child)
+        func visitDocument(_ node: Document) {
+            assert(state == .initial)
+            guard let firstChild = node.children.first else {
+                return
+            }
+
+            state = firstChild is Paragraph ? .summary : .discussion
+
+            for case let child in node.children {
+                visitBlock(child)
             }
         }
 
-        private func visitBlock(_ node: Node & Block) throws {
+        private func visitBlock(_ node: Node & Block) {
             switch (state, node) {
-            case (.summary, let node as Paragraph):
-                documentation.summary = node
+            case (.summary, _):
+                documentation.summary = node.description.trimmingCharacters(in: .whitespacesAndNewlines)
                 state = .discussion
             case (.discussion, let list as List) where list.kind == .bullet:
-                try visitBulletList(list)
+                visitBulletList(list)
             default:
                 if let part = DiscussionPart(node) {
                     documentation.discussionParts += [part]
@@ -87,15 +90,15 @@ extension Documentation {
             }
         }
 
-        private func visitBulletList(_ node: List) throws {
+        private func visitBulletList(_ node: List) {
             for item in node.children {
-                try visitBulletListItem(item)
+                visitBulletListItem(item)
             }
 
             state = .discussion
         }
 
-        private func visitBulletListItem(_ node: List.Item) throws {
+        private func visitBulletListItem(_ node: List.Item) {
             func appendListItemToDiscussion(_ item: List.Item) {
                 var list: List
                 if case let .list(lastPart) = documentation.discussionParts.last {
@@ -116,8 +119,8 @@ extension Documentation {
             }
 
             let string = node.description
-            let pattern = #"\s*[\-\+\*]\s*(?<parameter>(?:Parameter\s+)?)(?<name>[\w\h]+|Custom\(.+\)):(\s*(?<description>.+))?"#
-            let regularExpression = try NSRegularExpression(pattern: pattern, options: [.dotMatchesLineSeparators, .caseInsensitive])
+            let pattern = #"\s*[\-\+\*]\s*(?<parameter>(?:Parameter\s+)?)(?<name>[\w\h]+):(\s*(?<description>.+))?"#
+            let regularExpression = try! NSRegularExpression(pattern: pattern, options: [.dotMatchesLineSeparators, .caseInsensitive])
 
             guard let match = regularExpression.firstMatch(in: string, options: [], range: NSRange(string.startIndex ..< string.endIndex, in: string)),
                 let parameterRange = Range(match.range(at: 1), in: string),
@@ -139,22 +142,22 @@ extension Documentation {
             switch state {
             case .parameters,
                  _ where !parameterRange.isEmpty:
-                let parameter = try Parameter(name: name, description: description)
+                let parameter = Parameter(name: name, description: description)
                 documentation.parameters += [parameter]
             case .discussion:
                 if name.caseInsensitiveCompare("parameters") == .orderedSame {
                     state = .parameters
                     for case let nestedBulletList as List in node.children where nestedBulletList.kind == .bullet {
-                        try visitBulletList(nestedBulletList)
+                        visitBulletList(nestedBulletList)
                     }
                 } else if name.caseInsensitiveCompare("parameter") == .orderedSame {
-                    let parameter = try Parameter(name: name, description: description)
+                    let parameter = Parameter(name: name, description: description)
                     documentation.parameters += [parameter]
                 } else if name.caseInsensitiveCompare("returns") == .orderedSame {
-                    documentation.returns = try Document(description)
+                    documentation.returns = description
                 } else if name.caseInsensitiveCompare("throws") == .orderedSame {
-                    documentation.throws = try Document(description)
-                } else if let delimiter = Callout.Delimiter(rawValue: name) {
+                    documentation.throws = description
+                } else if let delimiter = Callout.Delimiter(rawValue: name.lowercased()) {
                     let callout = Callout(delimiter: delimiter, content: description)
                     documentation.discussionParts += [.callout(callout)]
                 } else {
