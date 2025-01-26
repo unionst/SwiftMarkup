@@ -3,11 +3,11 @@
     "pins": [
       {
         "package": "CommonMark",
-        "repositoryURL": "https://github.com/SwiftDocOrg/CommonMark.git",
+        "repositoryURL": "https://github.com/unionst/CommonMark.git",
         "state": {
-          "branch": null,
-          "revision": "1c8f3983c12b848e0d84b3a7a1d6f9a735e6661a",
-          "version": "0.5.0"
+          "branch": "main",
+          "revision": "f2f128e9b69fa55f8c017ba5cbd7fa7fcf864315",
+          "version": null
         }
       },
       {
